@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ReyBot AI Studio</title>
+    <!-- Import Google Gen AI SDK directly into the browser -->
+    <script type="importmap">
+        {
+            "imports": {
+                "@google/genai": "https://esm.run/@google/genai"
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg-color: #0d0d0d;
+            --accent-color: #ff3333;
+            --accent-glow: rgba(255, 51, 51, 0.4);
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-color: #f5f5f5;
+            --text-muted: #888888;
+            --active-item: rgba(255, 51, 51, 0.1);
+            --api-green: #00ff88;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: var(--accent-glow);
+            border-radius: 50%;
+            filter: blur(150px);
+            top: 10%;
+            left: 10%;
+            z-index: -1;
+        }
+
+        .studio-container {
+            width: 100%;
+            max-width: 1100px;
+            height: 85vh;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            display: flex;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 260px;
+            height: 100%;
+            border-right: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            background: rgba(0, 0, 0, 0.4);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 100;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 70px;
+        }
+
+        .brand h1 { font-size: 1.5rem; letter-spacing: 2px; text-transform: uppercase; }
+        .brand span { color: var(--accent-color); text-shadow: 0 0 10px var(--accent-color); }
+
+        .close-sidebar-btn { display: none; background: transparent; border: none; color: var(--text-color); font-size: 1.8rem; cursor: pointer; line-height: 1; }
+
+        .sidebar-controls { padding: 15px; display: flex; flex-direction: column; gap: 12px; }
+
+        .new-chat-btn {
+            background: transparent;
+            border: 1px solid var(--accent-color);
+            color: var(--text-color);
+            padding: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .new-chat-btn:hover { background: var(--accent-color); box-shadow: 0 0 15px var(--accent-color); }
+
+        .search-box input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--glass-border);
+            color: var(--text-color);
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            outline: none;
+        }
+
+        .chat-history-list {
+            flex: 1;
+            padding: 0 15px 15px 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .history-item {
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid transparent;
+            font-size: 0.85rem;
+            color: #ccc;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .history-item:hover, .history-item.active {
+            background: var(--active-item);
+            border-color: rgba(255, 51, 51, 0.2);
+            color: var(--text-color);
+        }
+
+        .chat-workspace {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .mobile-nav-bar {
+            display: none;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--glass-border);
+            background: rgba(0, 0, 0, 0.3);
+            align-items: center;
+            gap: 15px;
+            height: 70px;
+            flex-shrink: 0;
+        }
+
+        .menu-toggle-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            font-size: 1.4rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+
+        .feed-display {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 14px 18px;
+            line-height: 1.5;
+            font-size: 0.95rem;
+            animation: fadeIn 0.3s ease-out;
+            word-wrap: break-word;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 3px solid var(--text-muted);
+            align-self: flex-end;
+        }
+
+        .message.bot {
+            background: rgba(255, 51, 51, 0.03);
+            border-left: 3px solid var(--accent-color);
+            align-self: flex-start;
+            box-shadow: inset 0 0 15px rgba(255, 51, 51, 0.02);
+        }
+
+        .message .sender-tag {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+            color: var(--text-muted);
+        }
+
+        .message.bot .sender-tag { color: var(--accent-color); }
+
+        .generated-image {
+            max-width: 100%;
+            max-height: 350px;
+            border: 1px solid var(--glass-border);
+            margin-top: 10px;
+            display: block;
+        }
+
+        .control-panel {
+            padding: 20px;
+            border-top: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            flex-shrink: 0;
+        }
+
+        .input-wrapper { display: flex; gap: 10px; }
+
+        .input-wrapper textarea {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--glass-border);
+            color: var(--text-color);
+            padding: 12px;
+            resize: none;
+            height: 50px;
+            outline: none;
+            font-size: 0.95rem;
+        }
+
+        .action-btn {
+            background: transparent;
+            border: 1px solid var(--accent-color);
+            color: var(--text-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            background: var(--accent-color);
+            box-shadow: 0 0 15px var(--accent-color);
+        }
+
+        .action-btn:disabled {
+            border-color: var(--text-muted);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            background: transparent;
+        }
+
+        .mode-selectors { display: flex; gap: 15px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+
+        .mode-label { display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-muted); }
+
+        .mode-label:has(input:checked) { color: var(--text-color); }
+
+        .sidebar-overlay {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 90;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--glass-border); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-color); }
+
+        @media (max-width: 768px) {
+            body { padding: 0; }
+            .studio-container { height: 100vh; max-height: 100vh; border: none; }
+            .mobile-nav-bar { display: flex; }
+            .sidebar { position: absolute; top: 0; left: 0; bottom: 0; transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .sidebar.open + .sidebar-overlay { display: block; }
+            .close-sidebar-btn { display: block; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="studio-container">
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="brand"><h1>Rey<span>Bot</span></h1></div>
+                <button class="close-sidebar-btn" id="closeSidebarBtn">&times;</button>
+            </div>
+            <div class="sidebar-controls">
+                <button class="new-chat-btn" id="newChatBtn">+ New Chat</button>
+                <div class="search-box"><input type="text" id="searchChats" placeholder="Search chats..." /></div>
+            </div>
+            <div class="chat-history-list" id="chatHistoryList">
+                <div class="history-item active">Current Framework Session</div>
+                <div class="history-item">3D UI Concept Engine</div>
+                <div class="history-item">Automated Code Workspace</div>
+            </div>
+        </div>
+
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <div class="chat-workspace">
+            <div class="mobile-nav-bar">
+                <button class="menu-toggle-btn" id="menuToggleBtn">&#9776;</button>
+                <div class="brand"><h1>Rey<span>Bot</span></h1></div>
+            </div>
+            <div class="feed-display" id="feedDisplay">
+                <div class="message bot">
+                    <div class="sender-tag">ReyBot</div>
+                    System initialized. Secure API integration active. Select execution mode and input your prompt below.
+                </div>
+            </div>
+            <div class="control-panel">
+                <div class="mode-selectors">
+                    <label class="mode-label">
+                        <input type="radio" name="botMode" value="text" checked>
+                        <span>Normal Text AI</span>
+                    </label>
+                    <label class="mode-label">
+                        <input type="radio" name="botMode" value="image">
+                        <span>Image Generator</span>
+                    </label>
+                </div>
+                <div class="input-wrapper">
+                    <textarea id="promptInput" placeholder="Type a message or image concept description..."></textarea>
+                    <button class="action-btn" id="runBtn">Execute</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { GoogleGenAI } from '@google/genai';
+
+        /* 
+           ==========================================
+           👇 GREEN GLOW AREA: PASTE YOUR KEY HERE
+           ==========================================
+        */
+        const REYANSH_API_KEY = "AIzaSyDIRAXYin5F6R3SRPqn41bNixNJlczfEsE"; 
+        /* ========================================== */
+
+        const feedDisplay = document.getElementById('feedDisplay');
+        const promptInput = document.getElementById('promptInput');
+        const runBtn = document.getElementById('runBtn');
+        const newChatBtn = document.getElementById('newChatBtn');
+        const searchChats = document.getElementById('searchChats');
+        const chatHistoryList = document.getElementById('chatHistoryList');
+        const sidebar = document.getElementById('sidebar');
+        const menuToggleBtn = document.getElementById('menuToggleBtn');
+        const closeSidebarBtn = document.getElementById('closeSidebarBtn');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+        function toggleSidebar(open) {
+            if (open) { sidebar.classList.add('open'); } else { sidebar.classList.remove('open'); }
+        }
+
+        menuToggleBtn.addEventListener('click', () => toggleSidebar(true));
+        closeSidebarBtn.addEventListener('click', () => toggleSidebar(false));
+        sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
+
+        function logToFeed(sender, content, isImage = false) {
+            const msgBlock = document.createElement('div');
+            msgBlock.classList.add('message', sender === 'You' ? 'user' : 'bot');
+            const tag = document.createElement('div');
+            tag.classList.add('sender-tag');
+            tag.innerText = sender;
+            msgBlock.appendChild(tag);
+
+            if (isImage) {
+                const img = document.createElement('img');
+                img.src = content;
+                img.classList.add('generated-image');
+                msgBlock.appendChild(img);
+            } else {
+                const textNode = document.createElement('span');
+                textNode.innerHTML = content.replace(/\n/g, '<br>');
+                msgBlock.appendChild(textNode);
+            }
+            feedDisplay.appendChild(msgBlock);
+            feedDisplay.scrollTop = feedDisplay.scrollHeight;
+        }
+
+        async function handleExecution() {
+            const prompt = promptInput.value.trim();
+            const mode = document.querySelector('input[name="botMode"]:checked').value;
+
+            if (!REYANSH_API_KEY || REYANSH_API_KEY === "YOUR_API_KEY_HERE") {
+                alert("Execution Halted: Please replace 'YOUR_API_KEY_HERE' with your real Gemini API Key.");
+                return;
+            }
+            if (!prompt) return;
+
+            logToFeed('You', prompt);
+            promptInput.value = '';
+            runBtn.disabled = true;
+            runBtn.innerText = 'Processing...';
+
+            try {
+                const ai = new GoogleGenAI({ apiKey: REYANSH_API_KEY });
+                if (mode === 'text') {
+                    const systemInstruction = `You are ReyBot. Your personality is authentic, adaptive, highly creative, with a touch of wit and a 'beast' mode energy.`;
+                    const response = await ai.models.generateContent({
+                        model: 'gemini-2.5-flash',
+                        contents: prompt,
+                        config: { systemInstruction, temperature: 0.7 }
+                    });
+                    logToFeed('ReyBot', response.text);
+                } else if (mode === 'image') {
+                    const response = await ai.models.generateImages({
+                        model: 'imagen-3.0-generate-002', 
+                        prompt: prompt,
+                        config: { numberOfImages: 1, outputMimeType: 'image/jpeg', aspectRatio: '1:1' }
+                    });
+                    const base64Bytes = response.generatedImages[0].image.imageBytes;
+                    const dataUrl = `data:image/jpeg;base64,${base64Bytes}`;
+                    logToFeed('ReyBot', dataUrl, true);
+                }
+            } catch (err) {
+                console.error(err);
+                if (err.status === 429) {
+                    logToFeed('ReyBot', 'System Alert: You have reached your daily quota limit for the free tier. Please wait for the daily reset or upgrade your API plan at ai.google.dev.');
+                } else {
+                    logToFeed('ReyBot', `Execution Error: ${err.message || "Unable to parse request pipeline."}`);
+                }
+            } finally {
+                runBtn.disabled = false;
+                runBtn.innerText = 'Execute';
+            }
+        }
+
+        newChatBtn.addEventListener('click', () => {
+            feedDisplay.innerHTML = `<div class="message bot"><div class="sender-tag">ReyBot</div>New Session active. Fire away with your text or design commands.</div>`;
+            toggleSidebar(false);
+        });
+
+        searchChats.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const items = chatHistoryList.getElementsByClassName('history-item');
+            Array.from(items).forEach(item => {
+                item.style.display = item.innerText.toLowerCase().includes(searchTerm) ? 'block' : 'none';
+            });
+        });
+
+        chatHistoryList.addEventListener('click', (e) => {
+            if (e.target.classList.contains('history-item')) {
+                document.querySelector('.history-item.active')?.classList.remove('active');
+                e.target.classList.add('active');
+                toggleSidebar(false);
+            }
+        });
+
+        runBtn.addEventListener('click', handleExecution);
+        promptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleExecution(); }
+        });
+    </script>
+</body>
+</html>
